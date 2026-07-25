@@ -70,7 +70,8 @@ const adminAccounts = new Set();
 // or redeploys. Ask if you'd like this made to persist across restarts.
 let siteSettings = {
   title: 'Anonymous E2E Chat',
-  bgImage: ''
+  bgImage: '',
+  customCss: ''
 };
 
 
