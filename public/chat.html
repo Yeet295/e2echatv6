@@ -39,11 +39,36 @@
   .dm-controls { display: flex; gap: 4px; padding: 6px; border-top: 1px solid #333; }
   .dm-controls input { flex: 1; font-size: 13px; padding: 6px; }
   .dm-controls button { font-size: 13px; padding: 6px 10px; }
+
+  #admin-corner { text-align: right; font-size: 12px; }
+  #admin-corner a { color: #666; text-decoration: none; }
+  #admin-corner a:hover { color: #999; }
+  #admin-panel { background: #1a1a1a; border: 1px solid #333; border-radius: 6px; padding: 10px; margin: 8px 0; }
+  #admin-login-row, #admin-settings-row { display: flex; gap: 6px; }
+  #admin-settings-row input { flex: 1; }
+  #admin-msg { font-size: 12px; color: #f88; margin-top: 6px; }
 </style>
 </head>
 <body>
 
-<h2>Anonymous E2E Chat</h2>
+<div id="admin-corner">
+  <a id="admin-toggle" href="#">⚙ admin</a>
+</div>
+
+<div id="admin-panel" style="display:none;">
+  <div id="admin-login-row">
+    <input id="admin-password" type="password" placeholder="Admin password" />
+    <button id="admin-login-btn">Unlock</button>
+  </div>
+  <div id="admin-settings-row" style="display:none;">
+    <input id="site-title-input" placeholder="Site title" maxlength="100" />
+    <input id="site-bg-input" placeholder="Background image URL (optional)" maxlength="500" />
+    <button id="admin-save-btn">Apply</button>
+  </div>
+  <div id="admin-msg"></div>
+</div>
+
+<h2 id="site-title">Anonymous E2E Chat</h2>
 
 <div id="profile-row">
   <input id="display-name" placeholder="Your name" maxlength="30" />
@@ -71,6 +96,92 @@
 
 
 <script>
+// ---------- SITE SETTINGS (title / background — admin-editable) ----------
+
+async function applySiteSettings() {
+  try {
+    const res = await fetch('/site-settings', { credentials: 'same-origin' });
+    const settings = await res.json();
+    document.getElementById('site-title').textContent = settings.title;
+    document.title = settings.title;
+    document.body.style.backgroundImage = settings.bgImage ? `url("${settings.bgImage}")` : 'none';
+    document.body.style.backgroundSize = 'cover';
+    document.body.style.backgroundAttachment = 'fixed';
+    return settings;
+  } catch (e) {
+    return { title: 'Anonymous E2E Chat', bgImage: '' };
+  }
+}
+
+// ---------- ADMIN ----------
+
+const adminToggle = document.getElementById('admin-toggle');
+const adminPanel = document.getElementById('admin-panel');
+const adminLoginRow = document.getElementById('admin-login-row');
+const adminSettingsRow = document.getElementById('admin-settings-row');
+const adminPasswordInput = document.getElementById('admin-password');
+const adminLoginBtn = document.getElementById('admin-login-btn');
+const siteTitleInput = document.getElementById('site-title-input');
+const siteBgInput = document.getElementById('site-bg-input');
+const adminSaveBtn = document.getElementById('admin-save-btn');
+const adminMsg = document.getElementById('admin-msg');
+
+let panelOpen = false;
+adminToggle.addEventListener('click', async (e) => {
+  e.preventDefault();
+  panelOpen = !panelOpen;
+  adminPanel.style.display = panelOpen ? 'block' : 'none';
+  if (panelOpen) await refreshAdminPanel();
+});
+
+async function refreshAdminPanel() {
+  const res = await fetch('/admin/status', { credentials: 'same-origin' });
+  const { isAdmin } = await res.json();
+  if (isAdmin) {
+    adminLoginRow.style.display = 'none';
+    adminSettingsRow.style.display = 'flex';
+    const settings = await applySiteSettings();
+    siteTitleInput.value = settings.title;
+    siteBgInput.value = settings.bgImage;
+  } else {
+    adminLoginRow.style.display = 'flex';
+    adminSettingsRow.style.display = 'none';
+  }
+}
+
+adminLoginBtn.addEventListener('click', async () => {
+  const res = await fetch('/admin/login', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: adminPasswordInput.value })
+  });
+  if (res.ok) {
+    adminMsg.textContent = '';
+    adminPasswordInput.value = '';
+    await refreshAdminPanel();
+  } else {
+    adminMsg.textContent = 'Wrong password.';
+  }
+});
+
+adminSaveBtn.addEventListener('click', async () => {
+  const res = await fetch('/admin/settings', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: siteTitleInput.value, bgImage: siteBgInput.value })
+  });
+  if (res.ok) {
+    adminMsg.textContent = 'Saved.';
+    await applySiteSettings();
+  } else {
+    adminMsg.textContent = 'Could not save (are you still logged in as admin?).';
+  }
+});
+
+applySiteSettings();
+
 // ---------- STATE (declared first so early UI calls below can use it) ----------
 let ws;
 let myClientId = null;
