@@ -234,6 +234,7 @@ async function saveProfile() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(myProfile)
   });
+  renderRoster(); // update your own row immediately
 
   if (ws && ws.readyState === WebSocket.OPEN) {
     // Already connected — push the change out live instead of making
@@ -457,10 +458,19 @@ function enableInput() {
 
 function renderRoster() {
   rosterEl.innerHTML = '';
-  if (peerProfiles.size === 0) {
-    rosterEl.innerHTML = '<div style="color:#666; font-size:13px; padding:6px;">No one else here yet</div>';
-    return;
-  }
+
+  // Always show yourself, first, tagged distinctly — no DM button since
+  // you can't message yourself.
+  const meRow = document.createElement('div');
+  meRow.className = 'roster-entry';
+  const meLabel = document.createElement('div');
+  meLabel.className = 'roster-name';
+  meLabel.textContent = `${myProfile.pfp} ${myProfile.name} (you)`;
+  meRow.appendChild(meLabel);
+  rosterEl.appendChild(meRow);
+
+  if (peerProfiles.size === 0) return;
+
   for (const [clientId, profile] of peerProfiles) {
     const row = document.createElement('div');
     row.className = 'roster-entry';
